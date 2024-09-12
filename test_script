@@ -1,0 +1,304 @@
+#%% 
+import numpy as np 
+from learning_funcs import word2trans_matrix, WFA_func, WFA_SPEC_DECOMP
+from learning_funcs import cantor_pairing, inverse_cantor_pairing
+
+#%%
+# Example from the paper
+A_a = np.array([[3/4, 0], [0, 1/3]])
+A_b = np.array([[6/5, 2/3], [3/4, 1]])
+
+a_0 = np.array([[1/2], [1/2]])
+b_inf = np.array([[1], [-1]])
+A_array = np.stack( (A_a, A_b), axis=2)
+
+word1 = [1]
+word2 = [2]
+word11 = [1, 1]
+word12 = [1, 2]
+word21 = [2, 1]
+word22 = [2, 2]
+
+w1 = WFA_func(word1, a_0, A_array, b_inf)
+w2 = WFA_func(word2, a_0, A_array, b_inf)
+w11 = WFA_func(word11, a_0, A_array, b_inf)
+w12 = WFA_func(word12, a_0, A_array, b_inf)
+w21 = WFA_func(word21, a_0, A_array, b_inf)
+w22 = WFA_func(word22, a_0, A_array, b_inf)
+
+#%%
+H_z = np.zeros((3, 3, 3))
+H_z[0, :, 0] = [0, 20, 14]  # H_b(e,:)
+H_z[1, :, 0] = [20, 22, 15]  # H_b(a,:)
+H_z[2, :, 0] = [14, 45, 31]  # H_b(b,:)
+H_z[0, :, 1] = [20, 22, 15]  # H_b(ea,:)
+H_z[1, :, 1] = [22, 19, 13]  # H_b(aa,:)
+H_z[2, :, 1] = [45, 45, 32]  # H_b(ba,:)
+H_z[0, :, 2] = [14, 45, 31]  # H_b(b,:)
+H_z[1, :, 2] = [15, 29, 20]  # H_b(ab,:)
+H_z[2, :, 2] = [31, 85, 58]  # H_b(bb,:)
+H_z = H_z / 100
+num_states = 2
+num_letters = 2
+a_0t, A_arrayt, b_inft, P = WFA_SPEC_DECOMP(H_z)
+
+w1t  = WFA_func(word1, a_0t, A_arrayt, b_inft)
+w2t  = WFA_func(word2, a_0t, A_arrayt, b_inft)
+w11t = WFA_func(word11, a_0t, A_arrayt, b_inft)
+w12t = WFA_func(word12, a_0t, A_arrayt, b_inft)
+w21t = WFA_func(word21, a_0t, A_arrayt, b_inft)
+w22t = WFA_func(word22, a_0t, A_arrayt, b_inft)
+
+# %%
+arr = np.array([ [1, 2, 3], [4, 5, 6] ])
+new = arr.reshape((2,1,3))
+s = new[1, 0,2]
+# %%
+import numpy as np 
+import pywrapfst as fst 
+from learning_funcs import word2trans_matrix, WFA_func, WFA_SPEC_DECOMP
+from learning_funcs import DFA2FST, inverse_cantor_pairing, cantor_pairing
+
+A1 = np.zeros((3,3))
+A2 = np.zeros((3,3))
+A3 = np.zeros((3,3))
+
+A1[0, 1] = 1
+A1[1, 0] = 1
+
+A2[1, 2] = 1
+
+A3[0, 2] = 1
+A_array = np.stack((A1, A2, A3), 2)
+a_0   = np.array([0, 1, 0])
+b_inf = np.array([1,1 , 1])
+
+f, FST_array = DFA2FST(a_0, A_array, b_inf)
+f
+# %%
+import numpy as np 
+from TL_funcs import cs_key2cs_label, key2label, key2label_auto, output_key2output_label
+test_key   = np.array([1, 1, 1, 1])
+test_key_auto   = np.array([1, 1, 1, 1, 1])
+test_label = key2label(test_key)
+out_label  = output_key2output_label( test_key_auto[4] )
+test_label_auto = key2label_auto(test_key_auto)
+# %%
+import numpy as np 
+import pywrapfst as fst 
+from TL_funcs import cs_key2cs_label, key2label
+# Create an input symbol table
+input_syms = fst.SymbolTable()
+
+# Add symbols with integer IDs and corresponding strings
+# no cars on farm road, highway or emergency
+
+for emer_key in range(1,3):
+    for hcar_key in range(1,3):
+        for fcar_key in range(1,3):
+            for cs_key in range(1,4):
+                current_key   = np.array([emer_key, hcar_key, fcar_key, cs_key])
+                current_label = key2label(current_key)
+                #convert key temporarily to string to combine indices
+                key_str = ''.join(map(str, current_key))
+
+                # Convert the string to an integer
+                current_key_int = int(key_str)
+                input_syms.add_symbol( current_label , key = current_key_int)
+
+
+# Create an output symbol table
+output_syms = fst.SymbolTable()
+
+# Add symbols with integer IDs and corresponding strings
+output_syms.add_symbol('rr', key=1)
+output_syms.add_symbol('gr', key=2)
+output_syms.add_symbol('rg', key=3)
+
+# Create an empty FST
+f = fst.Fst()
+
+#add input and output symbol tables
+f.set_input_symbols(input_syms)
+f.set_output_symbols(output_syms)
+
+#add highway green, both red and farm green states
+H = f.add_state()
+B = f.add_state()
+F = f.add_state()
+
+#starts with both lights red
+f.set_start( B )
+#all states are possible final states
+f.set_final( H )
+f.set_final( B )
+f.set_final( F )
+
+#identity weight 
+eye_weight = fst.Weight.One(f.weight_type())
+
+#add stationary transitions for highway green
+f.add_arc(H, fst.Arc(1112, 2, eye_weight, H) )
+f.add_arc(H, fst.Arc(1212, 2, eye_weight, H) )
+
+#add stationary transitions for both red 
+f.add_arc(B, fst.Arc(2111, 1, eye_weight, B) )
+f.add_arc(B, fst.Arc(2121, 2, eye_weight, B) )
+f.add_arc(B, fst.Arc(2211, 1, eye_weight, B) )
+f.add_arc(B, fst.Arc(2221, 2, eye_weight, B) )
+
+#add stationary transitions for farm road green
+f.add_arc(F, fst.Arc(1113, 3, eye_weight, F) )
+f.add_arc(F, fst.Arc(1123, 3, eye_weight, F) )
+
+#add transition both red to highway green
+f.add_arc(B, fst.Arc(1211, 2, eye_weight, H) )
+f.add_arc(B, fst.Arc(1221, 2, eye_weight, H) )
+
+#add transtition both red to farm green
+f.add_arc(B, fst.Arc(1121, 3, eye_weight, F) )
+f.add_arc(B, fst.Arc(1221, 3, eye_weight, F) )
+
+#add transition highway green to both red 
+#emergency vehicle present
+f.add_arc(H, fst.Arc(2112, 1, eye_weight, B) )
+f.add_arc(H, fst.Arc(2122, 1, eye_weight, B) )
+f.add_arc(H, fst.Arc(2212, 1, eye_weight, B) )
+f.add_arc(H, fst.Arc(2222, 1, eye_weight, B) )
+
+#no emergency vehicle present
+f.add_arc(H, fst.Arc(1122, 1, eye_weight, B) )
+f.add_arc(H, fst.Arc(1222, 1, eye_weight, B) )
+
+#add transition farm road green to both red 
+#emergency vehicle present
+f.add_arc(F, fst.Arc(2113, 1, eye_weight, B) )
+f.add_arc(F, fst.Arc(2123, 1, eye_weight, B) )
+f.add_arc(F, fst.Arc(2213, 1, eye_weight, B) )
+f.add_arc(F, fst.Arc(2223, 1, eye_weight, B) )
+
+#no emergency vehicle present
+f.add_arc(F, fst.Arc(1213, 1, eye_weight, B) )
+f.add_arc(F, fst.Arc(1223, 1, eye_weight, B) )
+
+# %%
+import numpy as np 
+import pywrapfst as fst 
+from TL_funcs import TL_auto_syms_table, TL_input_syms_table, TL_output_syms_table, periodic_attacker, fst2auto
+
+table_auto, key_auto = TL_auto_syms_table()
+itab, ikey = TL_input_syms_table() 
+tab, key   = TL_output_syms_table() 
+
+attack      = periodic_attacker( tab, key, 4 )
+attack_auto = fst2auto(attack)
+# %%
+from funcs import supervisor
+from funcs import example 
+
+MK,P,As,Aa = example(2, 2)
+S,mk_auto, control_auto, controllable  = supervisor(MK,None ,As,Aa)
+
+
+# %%
+import numpy as np 
+import pywrapfst as fst 
+from TL_funcs import TL_auto_syms_table, TL_input_syms_table, TL_output_syms_table 
+from TL_funcs import fst2auto, periodic_attacker, TL_desired_lang
+from funcs import supervisor
+
+table_auto, key_auto = TL_auto_syms_table()
+itab, ikey = TL_input_syms_table() 
+tab, key = TL_output_syms_table() 
+desired = TL_desired_lang()
+
+#sensor attack
+sensor_attack     = periodic_attacker( tab, key, 2 )
+#actuator attack 
+actuator_attack   = periodic_attacker( itab, ikey, 2 )
+
+S,mk_auto, control_auto, controllable  = supervisor(desired,None ,sensor_attack , actuator_attack)
+# %%
+import numpy as np 
+import pywrapfst as fst 
+from TL_funcs import TL_auto_syms_table, TL_input_syms_table, TL_output_syms_table 
+from TL_funcs import fst2auto, periodic_attacker, TL_desired_lang
+
+table_auto, key_auto = TL_auto_syms_table()
+itab, ikey = TL_input_syms_table() 
+tab, key = TL_output_syms_table() 
+desired = TL_desired_lang()
+
+#actuator attack
+Aa      = periodic_attacker( itab, ikey, 2 )
+Aa_inv  = Aa.copy().invert().arcsort()
+Aa_comp = fst.compose( Aa_inv.copy(), Aa.copy() ).arcsort()
+
+#sensor atttack 
+As      = periodic_attacker( tab, key, 2 )
+As_inv  = As.copy().invert().arcsort()
+As_comp = fst.compose( As_inv.copy(), As.copy() ).arcsort() 
+
+sup  = desired.copy().invert()
+
+supc_a  = fst.compose( sup.copy(), Aa_comp.copy() ).arcsort()
+supc_s  = fst.compose( As_comp.copy(), sup.copy() ).arcsort()
+
+supc_sa = fst.compose( supc_s.copy(), Aa_comp.copy() ).arcsort()
+supc_as = fst.compose( As_comp.copy(), supc_a.copy() ).arcsort()
+
+control_sa = supc_sa.copy().invert().arcsort()
+control_as = supc_as.copy().invert().arcsort()
+control_auto_sa = fst2auto( control_sa )
+control_auto_as = fst2auto( control_as )
+desired_auto = fst2auto( desired.arcsort() )
+e_as = fst.equivalent(control_auto_as , desired_auto)
+e_sa = fst.equivalent(control_auto_sa , desired_auto)
+# %%
+import numpy as np 
+import pywrapfst as fst 
+from TL_funcs import TL_auto_syms_table, TL_input_syms_table, TL_output_syms_table 
+from TL_funcs import fst2auto, periodic_attacker, TL_desired_lang, fst2word, fst2word_list
+from learning_funcs import auto2Hz, DFA2FST, WFA_SPEC_DECOMP
+from TL_funcs import fst2auto 
+
+table_auto, key_auto = TL_auto_syms_table()
+itab, ikey = TL_input_syms_table() 
+tab, key = TL_output_syms_table() 
+desired = TL_desired_lang()
+
+
+#sensor atttack 
+As               = periodic_attacker( tab, key, 2 )
+
+num_samples      = 200
+max_length_sample = 2
+i_word, o_word, a_word, \
+    i_word_key, o_word_key, a_key, \
+        input_alphabet, output_alphabet, auto_alphabet \
+            = fst2word(As, 5)
+    
+input_word_list, output_word_list, auto_word_list,  \
+        input_word_key_list, output_word_key_list, auto_word_key_list, \
+          _, _, _  = fst2word_list(As, 5, 5)
+            
+As_auto  = fst2auto(As)            
+Hz_array = auto2Hz(As_auto, num_samples, max_length_sample)       
+t0, T_array, tf, _ = WFA_SPEC_DECOMP( Hz_array )
+f, f_array = DFA2FST(t0, T_array, tf)
+# %%
+from learning_funcs import mask2Hz_word
+
+P = ['epsilon', 'a', 'b']
+S = ['epsilon', 'c', 'd']
+Alphabet = ['epsilon', 'a', 'b', 'c', 'd']
+Hz_word, hb  = mask2Hz_word(P, S, Alphabet)
+# %%
+from learning_funcs import alphabet2mask 
+from learning_funcs import mask2Hz_word
+Alphabet = ['epsilon', 'a', 'b', 'c']
+max_word_length = 3
+P, S = alphabet2mask(Alphabet, max_word_length)
+Hz_word, hb  = mask2Hz_word(P, S, Alphabet)
+
+# %%
